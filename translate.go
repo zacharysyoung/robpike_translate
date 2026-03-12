@@ -28,13 +28,12 @@ func main() {
 		usage()
 	}
 
-	c, err := newTranslateClient()
+	c, err := NewTranslateClient()
 	if err != nil {
 		fatalf("error: %v", err)
 	}
 
-	translations, err := doTranslations(
-		c,
+	translations, err := c.Translate(
 		*target,
 		*source,
 		flag.Args())

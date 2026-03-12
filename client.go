@@ -19,8 +19,14 @@ import (
 	"google.golang.org/api/option"
 )
 
-// newTranslateClient creates an authenticated *[translate.Client].
-func newTranslateClient() (*translate.Client, error) {
+type TranslateClient struct{ c *translate.Client }
+
+// NewTranslateClient creates an authenticated *[translate.Client].
+//
+// It reads your authentication info from the environment,
+// presently at least a credentials.json file, and optionally
+// a cached token.json file.
+func NewTranslateClient() (*TranslateClient, error) {
 	httpClient, err := newHTTPClient()
 	if err != nil {
 		return nil, err
@@ -33,7 +39,7 @@ func newTranslateClient() (*translate.Client, error) {
 		return nil, err
 	}
 
-	return c, nil
+	return &TranslateClient{c}, nil
 }
 
 // doTranslations translates lines of text to target language.
@@ -41,7 +47,7 @@ func newTranslateClient() (*translate.Client, error) {
 // Use the two-letter BCP 47 language codes for source
 // and target; source can be left empty to force the
 // translator to auto-detect the language; target cannot be empty.
-func doTranslations(c *translate.Client, target, source string, lines []string) ([]translate.Translation, error) {
+func (tc *TranslateClient) Translate(target, source string, lines []string) ([]translate.Translation, error) {
 	tgt := language.Make(target)
 	src := language.Make(source)
 
@@ -49,7 +55,7 @@ func doTranslations(c *translate.Client, target, source string, lines []string) 
 		return nil, fmt.Errorf("could not parse target language tag %s; double-check the IETF BCP 47 language tag specificication", target)
 	}
 
-	return c.Translate(
+	return tc.c.Translate(
 		context.Background(),
 		lines,
 		tgt,
@@ -61,7 +67,7 @@ func doTranslations(c *translate.Client, target, source string, lines []string) 
 }
 
 // newHTTPClient handles all aspects of reading secrets and
-// token JSON, and initiating a web-based OAuth2 auth flow
+// token JSON, and initiating a web-based OAuth2 auth flow.
 func newHTTPClient() (*http.Client, error) {
 	b, err := os.ReadFile("credentials.json")
 	if err != nil {
