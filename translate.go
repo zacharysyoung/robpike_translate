@@ -13,7 +13,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -31,6 +31,10 @@ var (
 type Response struct {
 	Data struct {
 		Translations []Translation
+	}
+	Error struct {
+		Code    int
+		Message string
 	}
 }
 
@@ -63,7 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	res.Body.Close()
 	if err != nil {
 		log.Fatal(err)
@@ -71,6 +75,12 @@ func main() {
 	var r Response
 	if err := json.Unmarshal(data, &r); err != nil {
 		log.Fatal(err)
+	}
+	switch {
+	case r.Error.Code != 0, r.Error.Message != "":
+		log.Fatalf("(%d) %s", r.Error.Code, r.Error.Message)
+	case len(r.Data.Translations) == 0:
+		log.Fatal(string(data))
 	}
 	for _, t := range r.Data.Translations {
 		fmt.Printf("%s (%s)\n", html.UnescapeString(t.TranslatedText), t.DetectedSourceLanguage)
