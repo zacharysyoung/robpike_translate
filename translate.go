@@ -13,30 +13,27 @@ import (
 	"google.golang.org/api/option"
 )
 
-const usageText = `usage: translate [-to] [-from] [-credsPath] TEXT [...TEXT]
+const usageText = `usage: translate [-to] [-from] [-key] TEXT [...TEXT]
 
-The text arguments will be joined with a space, translated
-with Google's Translate/v3 API, and printed to stdout.  It
-uses the API's default translation models.
+The program translates the text arguments with Google's
+Translate.V3 API and prints to stdout; it uses the API's base model.
 
-This program requires a Service Account for a Google Cloud
-Project that has enabled the Translate API, and the down-
-loaded credentials file for that account.
+The program requires an API key for a Google Cloud Project (GCP)
+that has enabled the Cloud Translation API.
 
 -to string
   	target language (two-letter BCP-47 code) (default "en")
 -from string
   	source language (two-letter BCP-47 code); auto-detected by default
+-key string
+  	API key for translation-enabled GCP (default $GOOGLEAPIKEY)
 
--credsPath string
-  	path to service account credentials file; (defaults to
-  	$TRANSLATE_SVCACCTCREDSFILE); MUST be set in env, or by this flag
 `
 
 var (
 	targetFlag = flag.String("to", "en", "")
 	sourceFlag = flag.String("from", "", "")
-	credsFlag  = flag.String("credsPath", "", "")
+	keyFlag    = flag.String("key", "", "")
 )
 
 func main() {
@@ -47,11 +44,11 @@ func main() {
 		fatalf("error: no text arguments; run translate -h")
 	}
 
-	if *credsFlag == "" {
-		*credsFlag = os.Getenv("TRANSLATE_SVCACCTCREDSFILE")
+	if *keyFlag == "" {
+		*keyFlag = os.Getenv("GOOGLEAPIKEY")
 	}
-	if *credsFlag == "" {
-		fatalf("error: empty path to service account credentials file; run translate -h")
+	if *keyFlag == "" {
+		fatalf("error: empty API key; run translate -h")
 	}
 
 	tgtLang := language.Make(*targetFlag)
@@ -62,9 +59,7 @@ func main() {
 
 	ctx := context.Background()
 
-	client, err := translate.NewClient(
-		ctx, option.WithAuthCredentialsFile(
-			option.ServiceAccount, *credsFlag))
+	client, err := translate.NewClient(ctx, option.WithAPIKey(*keyFlag))
 	if err != nil {
 		fatalf("error: could not create translate client: %v", err)
 	}
