@@ -26,13 +26,18 @@ var (
 	key    = flag.String("key", "", "Google API key (defaults to $GOOGLEAPIKEY)")
 	target = flag.String("to", "en", "destination language (two-letter code)")
 	source = flag.String("from", "", "source language (two-letter code); auto-detected by default")
+
+	verbose = flag.Bool("v", false, "show entire JSON error for bad API calls")
 )
 
 type Response struct {
 	Data struct {
 		Translations []Translation
 	}
-	Error interface{}
+	Error struct {
+		Code    int
+		Message string
+	}
 }
 
 type Translation struct {
@@ -73,8 +78,14 @@ func main() {
 	if err := json.Unmarshal(data, &r); err != nil {
 		log.Fatal(err)
 	}
-	if r.Error != nil {
-		log.Fatal(string(data))
+	if r.Error.Code != 0 {
+		switch *verbose {
+		default:
+			log.Printf("(%d) %s", r.Error.Code, r.Error.Message)
+			log.Fatalf("rerun with -v for full error")
+		case true:
+			log.Fatal(string(data))
+		}
 	}
 	for _, t := range r.Data.Translations {
 		fmt.Printf("%s (%s)\n", html.UnescapeString(t.TranslatedText), t.DetectedSourceLanguage)
