@@ -20,20 +20,16 @@ import (
 //
 // The redirect handler will also compare state to the received
 // state query param in the request.
-func listenForAuthCode(
-	port string,
-	redirectPath string,
-	state string,
-	timeout time.Duration,
-) (
-	code string,
-	err error,
-) {
+func listenForAuthCode(port, redirectPath, state string, timeout time.Duration) (code string, err error) {
 	var (
 		handledRedirect = make(chan bool)
 		timedOut        = time.Tick(timeout)
-		userInterrupted = make(chan os.Signal, 1)
+		cancelledByUser = make(chan os.Signal, 1)
+
+		errWaiting = make(chan error, 1)
 	)
+
+	signal.Notify(cancelledByUser, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	http.HandleFunc(redirectPath, func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -46,41 +42,57 @@ func listenForAuthCode(
 
 	srv := http.Server{Addr: port}
 
-	go waitForShutdown(&srv, handledRedirect, timedOut, userInterrupted)
+	go waitToShutdown(&srv, handledRedirect, timedOut, cancelledByUser, errWaiting)
 
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		err = fmt.Errorf("problem with server: %v", err)
 	}
 
+	if err := <-errWaiting; err != nil {
+		return "", err
+	}
+
 	return code, err
 }
 
-func waitForShutdown(
+// waitToShutdown blocks until one of the three channels
+// receives a value, then gracefully shuts down srv, and
+// reports any errors on errWaiting.
+func waitToShutdown(
 	srv *http.Server,
+
 	handledRedirect <-chan bool,
 	timedOut <-chan time.Time,
-	userInterrupted chan os.Signal,
-) error {
-	var err error
+	cancelledByUser <-chan os.Signal,
 
-	signal.Notify(userInterrupted, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
+	errWaiting chan<- error,
+) {
+	var earlyErr error
 	select {
 	case <-handledRedirect:
 		break
 	case <-timedOut:
-		err = errors.New("timed out")
-	case <-userInterrupted:
+		earlyErr = errors.New("timed out waiting for redirect")
+	case <-cancelledByUser:
 		fmt.Print("\r") // clear terminal line of "^C"
-		err = errors.New("interrupted by user")
+		earlyErr = errors.New("user cancelled auth flow")
 	}
 
+	var srvErr error
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-
-	if err := srv.Shutdown(ctx); err != nil {
-		err = fmt.Errorf("trouble shutting down listeners: %v", err)
+	if srvErr = srv.Shutdown(ctx); srvErr != nil {
+		srvErr = fmt.Errorf("could not cleanly shut down: %v", srvErr)
 	}
 	cancel()
 
-	return err
+	var err error
+	switch {
+	case earlyErr != nil && srvErr != nil:
+		err = fmt.Errorf("after %v, %v", earlyErr, srvErr)
+	case earlyErr != nil:
+		err = earlyErr
+	case srvErr != nil:
+		err = srvErr
+	}
+	errWaiting <- err
 }
