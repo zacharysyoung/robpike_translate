@@ -13,7 +13,15 @@ import (
 	"google.golang.org/api/option"
 )
 
-const usageText = `usage: translate [-to] [-from] TEXT [...TEXT]
+const usageText = `usage: translate [-to] [-from] [-credsPath] TEXT [...TEXT]
+
+The text arguments will be joined with a space, translated
+with Google's Translate/v3 API, and printed to stdout.  It
+uses the API's default translation models.
+
+This program requires a Service Account for a Google Cloud
+Project that has enabled the Translate API, and the down-
+loaded credentials file for that account.
 
 -to string
   	target language (two-letter BCP-47 code) (default "en")
@@ -22,30 +30,28 @@ const usageText = `usage: translate [-to] [-from] TEXT [...TEXT]
 
 -credsPath string
   	path to service account credentials file; (defaults to
-  	$TRANSLATE_SVCACCTCREDSFILE); MUST be set in env or by flag
+  	$TRANSLATE_SVCACCTCREDSFILE); MUST be set in env, or by this flag
 `
 
 var (
 	targetFlag = flag.String("to", "en", "")
 	sourceFlag = flag.String("from", "", "")
-
-	credsFlag = flag.String("credsPath", "", "")
-	tokenFlag = flag.String("tokenPath", "", "")
+	credsFlag  = flag.String("credsPath", "", "")
 )
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	if len(flag.Args()) < 1 {
-		usage()
+	if len(flag.Args()) == 0 {
+		fatalf("error: no text arguments; run translate -h")
 	}
 
 	if *credsFlag == "" {
 		*credsFlag = os.Getenv("TRANSLATE_SVCACCTCREDSFILE")
 	}
 	if *credsFlag == "" {
-		fatalf("error: empty path to service account credentials file; run translate -h for help")
+		fatalf("error: empty path to service account credentials file; run translate -h")
 	}
 
 	tgtLang := language.Make(*targetFlag)
