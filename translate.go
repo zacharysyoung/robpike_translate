@@ -32,10 +32,7 @@ type Response struct {
 	Data struct {
 		Translations []Translation
 	}
-	Error struct {
-		Code    int
-		Message string
-	}
+	Error interface{}
 }
 
 type Translation struct {
@@ -76,10 +73,7 @@ func main() {
 	if err := json.Unmarshal(data, &r); err != nil {
 		log.Fatal(err)
 	}
-	switch {
-	case r.Error.Code != 0, r.Error.Message != "":
-		log.Fatalf("(%d) %s", r.Error.Code, r.Error.Message)
-	case len(r.Data.Translations) == 0:
+	if r.Error != nil {
 		log.Fatal(string(data))
 	}
 	for _, t := range r.Data.Translations {
