@@ -1,4 +1,4 @@
-module github.com/robpike/translate
+module github.com/zacharysyoung/robpike_translate
 
 go 1.25.0
 
