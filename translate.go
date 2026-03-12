@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+
+	"cloud.google.com/go/translate"
+	"golang.org/x/text/language"
+	"google.golang.org/api/option"
 )
 
 const usageText = `usage: translate [-to] [-from] TEXT [...TEXT]
@@ -15,12 +20,9 @@ const usageText = `usage: translate [-to] [-from] TEXT [...TEXT]
 -from string
   	source language (two-letter BCP-47 code); auto-detected by default
 
-
 -credsPath string
-  	path to creds.json; (defaults to $TRANSLATE_CREDSJSON);
-  	MUST be set in env or by flag
--tokenPath string
-  	path to cached token.json; (defaults to $TRANSLATE_TOKENJSON)
+  	path to service account credentials file; (defaults to
+  	$TRANSLATE_SVCACCTCREDSFILE); MUST be set in env or by flag
 `
 
 var (
@@ -40,25 +42,36 @@ func main() {
 	}
 
 	if *credsFlag == "" {
-		*credsFlag = os.Getenv("TRANSLATE_CREDSJSON")
+		*credsFlag = os.Getenv("TRANSLATE_SVCACCTCREDSFILE")
 	}
 	if *credsFlag == "" {
-		usage()
+		fatalf("error: empty path to service account credentials file; run translate -h for help")
 	}
 
-	if *tokenFlag == "" {
-		*tokenFlag = os.Getenv("TRANSLATE_TOKENJSON")
+	tgtLang := language.Make(*targetFlag)
+	srcLang := language.Make(*sourceFlag)
+	if tgtLang == language.Und {
+		fatalf("error: could not parse target language tag %s; double-check the IETF BCP 47 language tag specificication", *targetFlag)
 	}
 
-	c, err := NewTranslateClient()
+	ctx := context.Background()
+
+	client, err := translate.NewClient(
+		ctx, option.WithAuthCredentialsFile(
+			option.ServiceAccount, *credsFlag))
 	if err != nil {
-		fatalf("error: %v", err)
+		fatalf("error: could not create translate client: %v", err)
 	}
 
-	translations, err := c.Translate(
-		*targetFlag,
-		*sourceFlag,
-		flag.Args())
+	translations, err := client.Translate(
+		ctx,
+		flag.Args(),
+		tgtLang,
+		&translate.Options{
+			Source: srcLang,
+			Format: translate.Text,
+		},
+	)
 	if err != nil {
 		fatalf("error: %v", errors.Unwrap(err)) // experimentation showed that unwrapping provided a good one-line error message
 	}
