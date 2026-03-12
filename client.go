@@ -69,7 +69,7 @@ func (tc *TranslateClient) Translate(target, source string, lines []string) ([]t
 // newHTTPClient handles all aspects of reading secrets and
 // token JSON, and initiating a web-based OAuth2 auth flow.
 func newHTTPClient() (*http.Client, error) {
-	b, err := os.ReadFile("credentials.json")
+	b, err := os.ReadFile(*credsFlag)
 	if err != nil {
 		return nil, fmt.Errorf("could not read secret file: %v", err)
 	}
@@ -78,10 +78,9 @@ func newHTTPClient() (*http.Client, error) {
 		return nil, fmt.Errorf("could not create config: %v", err)
 	}
 
-	const tokenJSON = "token.json"
 	var token *oauth2.Token
 
-	b, err = os.ReadFile(tokenJSON)
+	b, err = os.ReadFile(*tokenFlag)
 	switch {
 	default:
 		return nil, fmt.Errorf("unexpected error reading token JSON: %v", err)
@@ -94,9 +93,11 @@ func newHTTPClient() (*http.Client, error) {
 		return nil, err
 	}
 
-	b, err = json.Marshal(token)
-	if err == nil {
-		os.WriteFile(tokenJSON, b, 0600)
+	if *tokenFlag != "" {
+		b, err = json.Marshal(token)
+		if err == nil {
+			os.WriteFile(*tokenFlag, b, 0600)
+		}
 	}
 
 	client := config.Client(context.Background(), token)
@@ -113,7 +114,7 @@ func userGetsTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 		redirectPath = "/redirect"
 	)
 
-	state := getRandState()
+	state := makeRandState()
 
 	config.RedirectURL = "http://localhost" + port + redirectPath
 
@@ -142,8 +143,10 @@ func userGetsTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 	return token, err
 }
 
-func getRandState() string {
-	b := make([]byte, 32)
-	rand.Read(b)
+// makeRandState returns a 32-char base64-encoded string of
+// random bytes.
+func makeRandState() string {
+	b := make([]byte, 24)
+	_, _ = rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
