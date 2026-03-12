@@ -1,4 +1,4 @@
-package auth
+package main
 
 import (
 	"context"
@@ -19,10 +19,8 @@ import (
 	"google.golang.org/api/option"
 )
 
-type Client struct{ c *translate.Client }
-
-// NewClient creates a properly authenticated [Client].
-func NewClient() (*Client, error) {
+// newTranslateClient creates an authenticated *[translate.Client].
+func newTranslateClient() (*translate.Client, error) {
 	httpClient, err := newHTTPClient()
 	if err != nil {
 		return nil, err
@@ -35,15 +33,15 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 
-	return &Client{c}, nil
+	return c, nil
 }
 
-// Translate translates lines of text to target language.
+// doTranslations translates lines of text to target language.
 //
-// Use the two-letter language abbreviations for source
-// and target; source can also be left empty to force the
-// translator to auto-detect the language.
-func (c Client) Translate(target, source string, lines []string) ([]translate.Translation, error) {
+// Use the two-letter BCP 47 language codes for source
+// and target; source can be left empty to force the
+// translator to auto-detect the language; target cannot be empty.
+func doTranslations(c *translate.Client, target, source string, lines []string) ([]translate.Translation, error) {
 	tgt := language.Make(target)
 	src := language.Make(source)
 
@@ -51,7 +49,7 @@ func (c Client) Translate(target, source string, lines []string) ([]translate.Tr
 		return nil, fmt.Errorf("could not parse target language tag %s; double-check the IETF BCP 47 language tag specificication", target)
 	}
 
-	return c.c.Translate(
+	return c.Translate(
 		context.Background(),
 		lines,
 		tgt,
@@ -119,7 +117,7 @@ func userGetsTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 
 	browser.OpenURL(authURL)
 
-	code, err := ListenForAuthCode(
+	code, err := listenForAuthCode(
 		port,
 		redirectPath,
 		state,

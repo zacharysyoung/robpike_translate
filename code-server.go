@@ -1,4 +1,4 @@
-package auth
+package main
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// ListenForAuthCode starts an ad-hoc localhost server that
+// listenForAuthCode starts an ad-hoc localhost server that
 // listens for the redirect call in the auth flow process and
 // returns the auth code.
 //
@@ -20,7 +20,7 @@ import (
 //
 // The redirect handler will also compare state to the received
 // state query param in the request.
-func ListenForAuthCode(
+func listenForAuthCode(
 	port string,
 	redirectPath string,
 	state string,
